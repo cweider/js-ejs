@@ -33,8 +33,9 @@ function escapeJSString(string) {
 
 function lex(text) {
     var token_expressions = [
+        ['\\s*\\n+\\s*', 'SPACE'],
         ['<%[^%](?:%+(?:%>|[^>])|[^%])*%>', 'EVAL'],
-        ['(?:<(?:%%|[^%]|$)|[^<])+', 'TEXT']
+        ['(?:<(?:%%|[^%\\n]|$)|[^<\\n])+', 'TEXT']
     ];
 
     var tokenRegExp = [];
@@ -45,6 +46,8 @@ function lex(text) {
 
     var tokens = [];
     var tokenMatch;
+
+    tokens.push({type: 'SPACE', match: '', value: '', offset: 0}); // Match /^/
     while (tokenMatch = tokenRegExp.exec(text)) {
         var token = {
             value: tokenMatch[0],
@@ -70,6 +73,39 @@ function lex(text) {
         }
 
         tokens.push(token);
+    }
+    tokens.push({type: 'SPACE', match: '', value: '', offset: text.length}); //Match /$/
+
+    return tokens;
+}
+
+function optimize(tokens) {
+    // SPACE EVAL+ SPACE -> trim(SPACE) EVAL+ trim(SPACE)
+    // SPACE -> TEXT
+    var token, i, ii;
+    tokens = tokens.concat();
+    i = 0;
+    ii = tokens.length;
+    while (i < ii) {
+        token = tokens[i];
+        if (token.type == 'SPACE') {
+            var j = i + 1;
+            if (j < ii) {
+                var token__ = tokens[j];
+                while (j < ii && token__.type == 'EVAL' && !token__.isEcho) { token__ = tokens[++j]; }
+
+                if (1 < j-i && j < ii && token__.type == 'SPACE') {
+                    var match;
+                    match = token.match.replace(/[^\n]*$/, '');
+                    tokens[i] = token = {type: 'SPACE', match: match, value: match, offset: token.offset};
+                    match = token__.match.replace(/^[^\n]*\n?/, '');
+                    tokens[j] = {type: 'SPACE', match: match, value: match, offset: token__.offset + (token__.match.length - match.length)};
+                }
+            }
+            token = {type: 'TEXT', match: token.match, value: token.value, offset: token.offset};
+            tokens[i] = token;
+        }
+        i++;
     }
 
     return tokens;
@@ -104,6 +140,7 @@ function generate(tokens) {
 function compile(text) {
     var tokens, code;
     tokens = lex(text);
+    tokens = optimize(tokens);
     code = generate(tokens);
     return code;
 }
@@ -135,6 +172,7 @@ function execute(code, context) {
 }
 
 exports.lex = lex;
+exports.optimize = optimize;
 exports.generate = generate;
 exports.compile = compile;
 
