@@ -33,6 +33,7 @@ function escapeJSString(string) {
 
 function lex(text) {
     var token_expressions = [
+        ['^%(?:[^%\\n][^\\n]+)?', 'LINEEVAL'],
         ['\\s*\\n+\\s*', 'SPACE'],
         ['<%[^%](?:%+(?:%>|[^>])|[^%])*%>', 'EVAL'],
         ['(?:<(?:%%|[^%\\n]|$)|[^<\\n])+', 'TEXT']
@@ -42,7 +43,7 @@ function lex(text) {
     for (var i = 0, ii = token_expressions.length; i < ii; i++) {
         tokenRegExp.push(token_expressions[i][0]);
     }
-    tokenRegExp = new RegExp('(' + tokenRegExp.join(')|(') + ')', 'g');
+    tokenRegExp = new RegExp('(' + tokenRegExp.join(')|(') + ')', 'gm');
 
     var tokens = [];
     var tokenMatch;
@@ -70,6 +71,10 @@ function lex(text) {
             } else {
                 token.value = token.match.substring(2, token.match.length-2);
             }
+        } else if (token.type == 'LINEEVAL') {
+            token.type = 'EVAL';
+            token.value = token.match.substring(1);
+            token.match = '%' + token.value;
         }
 
         tokens.push(token);
@@ -167,7 +172,7 @@ function generate(tokens) {
     }
 
     emittedCode = emittedCode.join('\n');
-    emittedCode = emittedCode.replace(/(<%)%|%(%>)/g, '$1$2');
+    emittedCode = emittedCode.replace(/(<%)%|%(%>)|(^%|\n%)%/g, '$1$2$3');
 
     return emittedCode;
 }
