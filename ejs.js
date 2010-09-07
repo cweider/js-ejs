@@ -82,6 +82,7 @@ function lex(text) {
 function optimize(tokens) {
     // SPACE EVAL+ SPACE -> trim(SPACE) EVAL+ trim(SPACE)
     // SPACE -> TEXT
+    // TEXT TEXT+ -> TEXT
     var token, i, ii;
     tokens = tokens.concat();
     i = 0;
@@ -108,7 +109,41 @@ function optimize(tokens) {
         i++;
     }
 
-    return tokens;
+    var newTokens = [];
+    i = 0;
+    ii = tokens.length;
+    while (i < ii) {
+        token = tokens[i];
+        if (token.type == 'TEXT') {
+            var j = i + 1;
+            if (j < ii && tokens[j].type == 'TEXT') {
+                var match = [token.match];
+                var value = [token.value];
+                var token_ = tokens[j];
+                do {
+                    match.push(token_.match);
+                    value.push(token_.value);
+                    token_ = tokens[++j];
+                } while (j < ii && token_.type == 'TEXT');
+                match = match.join('');
+                value = value.join('');
+
+                token = {type: 'TEXT', match: match, value: value, offset: tokens[i].offset};
+                i = j;
+            } else {
+                i++;
+            }
+
+            if (token.value.length > 0) {
+                newTokens.push(token);
+            }
+        } else {
+            newTokens.push(token);
+            i++;
+        }
+    }
+
+    return newTokens;
 }
 
 function generate(tokens) {
