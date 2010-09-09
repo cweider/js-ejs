@@ -185,12 +185,12 @@ function compile(text) {
     return code;
 }
 
-function execute(code, context) {
-    var text = [];
-    var key;
+function execute(code, context, renderMethods) {
+    var renderOperation = [];
+    var key, methodName;
     function echo(value) {
         if (value != null) {
-            text.push(value.toString());
+            renderOperation.push(value.toString());
         }
     }
 
@@ -201,6 +201,21 @@ function execute(code, context) {
             _context[key] = context[key];
         }
     }
+    // RenderMethods are special and get augmented with the renderOperation
+    //  passed in as their intial argument.
+    for (methodName in renderMethods) {
+        if (Object.prototype.hasOwnProperty.call(renderMethods, methodName) &&
+            !Object.prototype.hasOwnProperty.call(_context, methodName)) {
+            _context[methodName] = function (method) {
+                function invokeRenderMethod() {
+                    var _arguments = Array.prototype.slice.call(arguments)
+                    _arguments.unshift(renderOperation);
+                    return method.apply(this, _arguments);
+                };
+                return invokeRenderMethod;
+            } (renderMethods[methodName]);
+        }
+    }
     // If not defined already in the context then add echo (used by <%=)
     if (!Object.prototype.hasOwnProperty.call(_context, 'echo')) {
         _context['echo'] = echo;
@@ -208,7 +223,7 @@ function execute(code, context) {
 
     (new Function('context', 'with (context) {'+code+'}'))(_context);
 
-    return text.join('');
+    return renderOperation.join('');
 }
 
 exports.lex = lex;
