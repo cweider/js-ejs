@@ -122,16 +122,30 @@ function optimize(tokens) {
         if (token.type == 'TEXT') {
             var j = i + 1;
             if (j < ii && tokens[j].type == 'TEXT') {
-                var match = [token.match];
-                var value = [token.value];
+                var match = token.match;
+                var value = token.value;
                 var token_ = tokens[j];
+
+                // Micro-optimize common case of TEXT(SPACE) TEXT TEXT(SPACE)
+                //  Use addition if only a few concats are needed.
+                var k = Math.min(j + 3, ii);
                 do {
-                    match.push(token_.match);
-                    value.push(token_.value);
+                    match += token_.match;
+                    value += token_.value;
                     token_ = tokens[++j];
-                } while (j < ii && token_.type == 'TEXT');
-                match = match.join('');
-                value = value.join('');
+                } while (j < k && token_.type == 'TEXT');
+
+                if (j < ii && token_.type == 'TEXT') {
+                    match = [match];
+                    value = [value];
+                    do {
+                        match.push(token_.match);
+                        value.push(token_.value);
+                        token_ = tokens[++j];
+                    } while (j < ii && token_.type == 'TEXT');
+                    match = match.join('');
+                    value = value.join('');
+                }
 
                 token = {type: 'TEXT', match: match, value: value, offset: tokens[i].offset};
                 i = j;
