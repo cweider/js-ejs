@@ -21,3 +21,4 @@
 */
 
 exports.compiler = require("./compiler");
+exports.Template = require("./template").Template;
